@@ -132,7 +132,7 @@ createdb athena
 # 2. Embedding model (~120 MB, once) and ingest
 cd ingest
 uv run athena-ingest download-model
-uv run athena-ingest run --okb ~/Developer/obscura-simple-prototype/CMKL-Chatbot/base-current
+uv run athena-ingest run --okb /path/to/CMKL-Chatbot/base-current
 #   {"sections": 383, "chunks": 1405, "embedded": 1405, ...}  ~25 s; re-runs only redo changed pages
 cd ..
 
@@ -182,7 +182,7 @@ Copy [`skills/cmkl-handbook`](skills/cmkl-handbook) into `~/.claude/skills/` to 
 docker compose up -d db
 docker compose run --rm ingest run --okb /okb/okb-mini --no-embed      # synthetic fixture
 # or the real OKB: mount the git repo that holds it, so the change log can be read
-OKB_REPO=~/Developer/obscura-simple-prototype/CMKL-Chatbot docker compose run --rm ingest run --okb /okb/base-current
+OKB_REPO=/path/to/CMKL-Chatbot docker compose run --rm ingest run --okb /okb/base-current
 docker compose up -d app
 ```
 
