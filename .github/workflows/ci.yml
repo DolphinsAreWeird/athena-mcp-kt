@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kotlin:
+    name: Kotlin build + tests (Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      # Unit tests, MCP tool tests over an in-memory transport, HTTP route tests, and the Postgres
+      # integration tests against pgvector/pgvector in Docker (Testcontainers).
+      - run: ./gradlew build --no-daemon
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kotlin-test-reports
+          path: build/reports/tests/test
+
+  python:
+    name: Python ingest tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ingest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+
+  e2e:
+    name: End to end (ingest -> Postgres -> REST + MCP stdio)
+    needs: [kotlin, python]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_USER: athena
+          POSTGRES_PASSWORD: athena
+          POSTGRES_DB: athena
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U athena -d athena" --health-interval 2s --health-retries 30
+    env:
+      DATABASE_URL: postgresql://athena:athena@localhost:5432/athena
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+      - name: Ingest the synthetic fixture OKB (lexical only, no model download)
+        working-directory: ingest
+        run: uv sync --frozen --no-dev && uv run athena-ingest run --okb ../fixtures/okb-mini --no-embed
+      - run: ./gradlew installDist --no-daemon
+      - name: REST
+        run: |
+          build/install/athena-mcp/bin/athena-mcp serve > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8080/health && break; sleep 1; done
+          curl -sf "localhost:8080/search?q=tuition+refund" | tee search.json
+          python3 -c "import json; r=json.load(open('search.json')); assert r['results'][0]['sectionId']=='general/policies/tuition-refunds', r; assert r['results'][0]['citation']['path'].endswith('.md')"
+      - name: MCP over stdio
+        run: |
+          ( printf '%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+              '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_handbook","arguments":{"query":"academic probation","top_k":1}}}'
+            sleep 8 ) | build/install/athena-mcp/bin/athena-mcp stdio > stdio.out
+          python3 -c "
+          import json
+          msgs = [json.loads(l) for l in open('stdio.out')]          # every stdout line must be JSON-RPC
+          call = next(m for m in msgs if m.get('id') == 2)
+          text = call['result']['content'][0]['text']
+          assert 'aice-beng/32-academic-probation.md' in text, text
+          print(text)"
+      - if: failure()
+        run: cat server.log || true
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t athena-mcp .
+      - run: docker build -f ingest/Dockerfile -t athena-ingest .

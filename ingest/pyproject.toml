@@ -1,0 +1,26 @@
+[project]
+name = "athena-ingest"
+version = "0.1.0"
+description = "Loads Athena OKB handbook pages into Postgres (full-text + pgvector) for athena-mcp-kt"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "psycopg[binary]>=3.2",
+    "numpy>=2.0",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.20",
+    "huggingface-hub>=0.26",
+]
+
+[project.scripts]
+athena-ingest = "athena_ingest.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

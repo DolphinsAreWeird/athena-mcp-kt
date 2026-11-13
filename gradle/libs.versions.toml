@@ -1,0 +1,32 @@
+[versions]
+kotlin = "2.4.21"
+ktor = "3.6.1"
+mcp = "0.16.0"
+coroutines = "1.11.0"
+serialization = "1.13.0"
+logback = "1.6.6"
+postgres = "42.7.14"
+hikari = "7.1.0"
+onnxruntime = "1.32.0"
+djl = "0.40.0"
+testcontainers = "2.0.5"
+
+[libraries]
+mcp-server = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref = "mcp" }
+mcp-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcp" }
+mcp-testing = { module = "io.modelcontextprotocol:kotlin-sdk-testing", version.ref = "mcp" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgres" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+onnxruntime = { module = "com.microsoft.onnxruntime:onnxruntime", version.ref = "onnxruntime" }
+djl-tokenizers = { module = "ai.djl.huggingface:tokenizers", version.ref = "djl" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

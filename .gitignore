@@ -1,0 +1,17 @@
+.gradle/
+build/
+.kotlin/
+.idea/
+*.iml
+out/
+.DS_Store
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+ingest/.venv/
+# Local data
+models/
+.env
+eval/runs/

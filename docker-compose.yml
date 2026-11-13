@@ -1,0 +1,49 @@
+# Postgres + pgvector, the ingest job and the server.
+#
+#   docker compose up -d db
+#   OKB_REPO=~/path/to/CMKL-Chatbot docker compose run --rm ingest run --okb /okb/base-current
+#   (or, with the synthetic fixtures:  docker compose run --rm ingest run --okb /okb/okb-mini --no-embed)
+#   docker compose up -d app        # http://localhost:8080/health, /search?q=..., MCP at /mcp
+#
+# With no OKB_REPO, the synthetic fixture OKB is used. Mount the whole git repo that holds the OKB
+# (not just its folder) so the change log can be read. The model folder comes from
+# `athena-ingest download-model`; without it, ingest with --no-embed and search is lexical only.
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: athena
+      POSTGRES_PASSWORD: athena
+      POSTGRES_DB: athena
+    ports: ["5433:5432"]   # 5433 on the host, so it doesn't clash with a local Postgres
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U athena -d athena"]
+      interval: 2s
+      retries: 30
+
+  ingest:
+    build: {context: ., dockerfile: ingest/Dockerfile}
+    profiles: ["ingest"]
+    environment:
+      DATABASE_URL: postgresql://athena:athena@db:5432/athena
+      ATHENA_MODEL_DIR: /models
+    volumes:
+      - ${OKB_REPO:-./fixtures}:/okb:ro
+      - ${ATHENA_MODEL_DIR:-~/.cache/athena-mcp/models/paraphrase-multilingual-MiniLM-L12-v2}:/models:ro
+    depends_on:
+      db: {condition: service_healthy}
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://athena:athena@db:5432/athena
+      ATHENA_ALLOWED_HOSTS: localhost,127.0.0.1
+    ports: ["8080:8080"]
+    volumes:
+      - ${ATHENA_MODEL_DIR:-~/.cache/athena-mcp/models/paraphrase-multilingual-MiniLM-L12-v2}:/models:ro
+    depends_on:
+      db: {condition: service_healthy}
+
+volumes:
+  pgdata:

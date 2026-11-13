@@ -1,0 +1,10 @@
+.git
+.gradle
+build
+.kotlin
+.idea
+**/.venv
+**/__pycache__
+**/.pytest_cache
+eval/runs
+CLAUDE.md
