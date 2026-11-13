@@ -74,6 +74,6 @@ object Formatting {
             }
             appendLine("- ${c.date} · ${c.action} · $what ($status) — ${c.path} · by ${c.author} · commit ${c.commit}")
         }
-        append("Each change was approved in Athena's review portal; cite the page path and date.")
+        append("Each entry is a reviewed edit from Athena's change log (approvals, new pages, deletions, undos); cite the page path and date.")
     }
 }
