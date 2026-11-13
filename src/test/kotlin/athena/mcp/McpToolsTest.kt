@@ -3,16 +3,18 @@ package athena.mcp
 import athena.search.HandbookService
 import athena.testing.FakeHandbookStore
 import athena.testing.HashingEmbedder
+import io.modelcontextprotocol.kotlin.sdk.ExperimentalMcpApi
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.ClientOptions
 import io.modelcontextprotocol.kotlin.sdk.testing.ChannelTransport
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonArray
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.TestInstance
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -22,27 +24,32 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Talks to the real MCP server through an in-memory transport, exactly as Claude would over stdio.
+ * Talks to the real MCP server through an in-memory transport, exactly as Claude would over stdio:
+ * one session for the whole class, many tool calls, closed at the end.
  * `runBlocking`, not `runTest`: runTest's virtual clock would skip past the client's request timeout
  * while the server is still working on real threads.
  */
+@OptIn(ExperimentalMcpApi::class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class McpToolsTest {
     private val service = HandbookService(FakeHandbookStore(), HashingEmbedder())
+    private val server = createMcpServer(service)
+    private val client = Client(clientInfo = Implementation(name = "test-client", version = "1.0"), options = ClientOptions())
 
-    private fun withClient(block: suspend (Client) -> Unit) = runBlocking {
-        val server = createMcpServer(service)
+    @BeforeAll
+    fun connect() = runBlocking {
         val (clientTransport, serverTransport) = ChannelTransport.createLinkedPair()
-        val client = Client(clientInfo = Implementation(name = "test-client", version = "1.0"), options = ClientOptions())
-        joinAll(
-            launch { client.connect(clientTransport) },
-            launch { server.createSession(serverTransport) },
-        )
-        try {
-            block(client)
-        } finally {
-            client.close()
-        }
+        server.createSession(serverTransport)   // the server listens first, then the client initializes
+        client.connect(clientTransport)
     }
+
+    @AfterAll
+    fun disconnect() = runBlocking {
+        client.close()
+        server.close()
+    }
+
+    private fun withClient(block: suspend (Client) -> Unit) = runBlocking { block(client) }
 
     private val CallToolResult.text: String get() = content.filterIsInstance<TextContent>().joinToString("\n") { it.text }
 

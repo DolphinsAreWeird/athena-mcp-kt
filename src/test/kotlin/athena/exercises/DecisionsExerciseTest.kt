@@ -7,12 +7,11 @@ import athena.search.HandbookService
 import athena.testing.FakeHandbookStore
 import athena.testing.FixtureOkb
 import athena.testing.HashingEmbedder
+import io.modelcontextprotocol.kotlin.sdk.ExperimentalMcpApi
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.testing.ChannelTransport
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Disabled
 import kotlin.test.Test
@@ -20,6 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** EXERCISE 3 — see EXERCISES.md. Delete the @Disabled line, then make these pass. */
+@OptIn(ExperimentalMcpApi::class)
 @Disabled("Exercise 3: implement parseDecisions and a find_decisions tool, then delete this line")
 class DecisionsExerciseTest {
     @Test
@@ -50,12 +50,14 @@ class DecisionsExerciseTest {
         val server = createMcpServer(HandbookService(FakeHandbookStore(), HashingEmbedder()))
         val (clientTransport, serverTransport) = ChannelTransport.createLinkedPair()
         val client = Client(clientInfo = Implementation(name = "test", version = "1.0"))
-        joinAll(launch { client.connect(clientTransport) }, launch { server.createSession(serverTransport) })
+        server.createSession(serverTransport)
+        client.connect(clientTransport)
 
         val result = client.callTool("find_decisions", mapOf("topic" to "leave of absence"))
         val text = result.content.filterIsInstance<TextContent>().joinToString { it.text }
         assertTrue("GSC-2026-08-D2" in text, text)
         assertTrue("minutes/2026-08-20-gsc" in text, "cites the minutes page: $text")
         client.close()
+        server.close()
     }
 }
